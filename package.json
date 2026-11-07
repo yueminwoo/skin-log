@@ -1,0 +1,17 @@
+{
+  "name": "skin-log",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "vite": "^5.4.21"
+  },
+  "private": true,
+  "type": "module"
+}
