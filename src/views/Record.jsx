@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
-import { useApp, Chip, Row, Section, usePhotoURL, toggle } from '../ui.jsx';
+import { useApp, Chip, Row, Section, usePhotoURL, toggle, useScrollLock } from '../ui.jsx';
 import {
   SESSIONS, PARTS, FACE_ZONES, BODY_ZONES, BLEMISH_FACE_ZONES, STATES, MORPHS, TRACES, SIZES, TREATMENTS,
   EXTRACT_RESULTS, state, isEnd, whereLabel, sizeLabel, traceLabel, treatmentLabel, fmtDate, fmtShort, addDays,
@@ -253,10 +253,7 @@ function PinEditor({ date, session, part, onClose }) {
 
   const selB = list.find((b) => b.id === sel);
 
-  useEffect(() => {
-    document.body.classList.add('noscroll');
-    return () => document.body.classList.remove('noscroll');
-  }, []);
+  useScrollLock();
 
   return createPortal(
     <div class="editor" role="dialog" aria-label="뾰루지 표시">

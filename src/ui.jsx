@@ -48,12 +48,9 @@ export function Sheet({ title, onClose, children, wide, footer }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
     addEventListener('keydown', onKey);
-    document.body.classList.add('noscroll');
-    return () => {
-      removeEventListener('keydown', onKey);
-      document.body.classList.remove('noscroll');
-    };
+    return () => removeEventListener('keydown', onKey);
   }, []);
+  useScrollLock();
   return createPortal(
     <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div class={`sheet${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
@@ -69,6 +66,17 @@ export function Sheet({ title, onClose, children, wide, footer }) {
     </div>,
     document.body
   );
+}
+
+// 겹쳐 열린 창들이 모두 닫혀야 스크롤 잠금 해제
+let locks = 0;
+export function useScrollLock() {
+  useEffect(() => {
+    if (locks++ === 0) document.body.classList.add('noscroll');
+    return () => {
+      if (--locks === 0) document.body.classList.remove('noscroll');
+    };
+  }, []);
 }
 
 export function usePhotoURL(store, name, v) {
