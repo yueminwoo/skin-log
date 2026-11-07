@@ -121,6 +121,7 @@ function Welcome({ onChoose }) {
         }}>구글 드라이브 연결</button>
         <hr />
         <button type="button" class="btn ghost" onClick={() => onChoose('demo')}>데모로 먼저 써보기 (이 기기에만 저장)</button>
+        <a class="link-btn center" href="./privacy.html">개인정보처리방침</a>
       </div>
     </div>
   );

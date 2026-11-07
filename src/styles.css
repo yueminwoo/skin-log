@@ -323,3 +323,4 @@ table.log th { color: var(--muted); font-weight: 600; }
   .prod-row { grid-template-columns: minmax(180px, 1fr) auto auto auto auto; }
   .prod-row .input:first-child { grid-column: auto; }
 }
+.link-btn.center { align-self: center; font-size: 13px; font-weight: 500; text-decoration: none; }
