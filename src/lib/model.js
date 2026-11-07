@@ -19,38 +19,51 @@ export const BODY_ZONES = [
   { id: 'back', label: '등' },
   { id: 'chest', label: '가슴' },
 ];
-// 뾰루지 위치용 (코 추가)
-export const BLEMISH_FACE_ZONES = [...FACE_ZONES.slice(0, 4), { id: 'nose', label: '코' }, FACE_ZONES[4]];
+// 뾰루지 위치용 (눈썹·코 추가)
+export const BLEMISH_FACE_ZONES = [
+  { id: 'forehead', label: '이마' },
+  { id: 'brow', label: '눈썹' },
+  { id: 'upperCheek', label: '윗볼' },
+  { id: 'nose', label: '코' },
+  { id: 'philtrum', label: '인중' },
+  { id: 'lowerCheek', label: '아랫볼' },
+  { id: 'chin', label: '턱' },
+];
 const ZONE_LABEL = Object.fromEntries([...BLEMISH_FACE_ZONES, ...BODY_ZONES].map((z) => [z.id, z.label]));
 export const zoneLabel = (id) => ZONE_LABEL[id] || id || '-';
 export const partLabel = (id) => PARTS.find((p) => p.id === id)?.label || id;
+export const whereLabel = (b) => (b.part === 'face' ? zoneLabel(b.zone) : partLabel(b.part));
 
-export const STAGES = [
-  { id: 'rise', label: '올라옴', color: '#e0a03a' },
-  { id: 'inflamed', label: '염증', color: '#d64545' },
-  { id: 'pus', label: '화농', color: '#b8892a' },
-  { id: 'calming', label: '가라앉는 중', color: '#6f8f4e' },
-  { id: 'mark', label: '자국', color: '#8a6fb0' },
-  { id: 'healed', label: '완치', color: '#2f8f7d' },
+// 뾰루지 상태 (체크마다 기록). group: active=진행 중 모양, healing=회복, end=추적 종료
+export const STATES = [
+  { id: 'open', label: '개방면포', group: 'active', sev: 1, color: '#5f6b73' },
+  { id: 'closed', label: '폐쇄면포', group: 'active', sev: 2, color: '#a08a4a' },
+  { id: 'papule', label: '구진', group: 'active', sev: 3, color: '#d64545' },
+  { id: 'pustule', label: '농포', group: 'active', sev: 4, color: '#b97d0c' },
+  { id: 'nodule', label: '결절', group: 'active', sev: 5, color: '#9b2c3c' },
+  { id: 'cyst', label: '낭포', group: 'active', sev: 6, color: '#76308a' },
+  { id: 'healing', label: '아무는 중', group: 'healing', color: '#6f8f4e' },
+  { id: 'trace', label: '흔적만 남음', group: 'end', color: '#8a6fb0' },
+  { id: 'clear', label: '깨끗이 사라짐', group: 'end', color: '#2f8f7d' },
 ];
-export const stage = (id) => STAGES.find((s) => s.id === id) || STAGES[0];
+export const MORPHS = STATES.filter((x) => x.group === 'active');
+export const state = (id) => STATES.find((x) => x.id === id) || STATES[2];
+export const isEnd = (id) => state(id).group === 'end';
 
-export const TYPES = [
-  { id: 'whitehead', label: '좁쌀' },
-  { id: 'blackhead', label: '블랙헤드' },
-  { id: 'papule', label: '빨간 뾰루지' },
-  { id: 'pustule', label: '고름' },
-  { id: 'nodule', label: '결절·낭포' },
+export const TRACES = [
+  { id: 'pie', label: '붉은 자국' },
+  { id: 'pih', label: '갈색 자국' },
+  { id: 'atrophic', label: '패인 흉터' },
+  { id: 'hypertrophic', label: '볼록 흉터' },
 ];
-export const typeLabel = (id) => TYPES.find((t) => t.id === id)?.label || '-';
+export const traceLabel = (id) => TRACES.find((t) => t.id === id)?.label || '흔적';
 
 export const SIZES = [
-  { id: 's', label: '소' },
-  { id: 'm', label: '중' },
-  { id: 'l', label: '대' },
+  { id: 's', label: '소', hint: '2mm 미만' },
+  { id: 'm', label: '중', hint: '2~5mm' },
+  { id: 'l', label: '대', hint: '5mm 이상' },
 ];
-export const LEVELS = [0, 1, 2, 3];
-export const CAUSES = ['새 제품', '수면 부족', '음식', '마찰', '땀', '스트레스', '모름'];
+export const sizeLabel = (id) => SIZES.find((x) => x.id === id)?.label || '-';
 
 export const TREATMENTS = [
   { id: 'patch', label: '패치' },
@@ -95,7 +108,7 @@ export function defaultSettings() {
 
 export const emptySession = () => ({ photos: {}, cleansing: [], skincare: {}, memo: '' });
 export const newDay = (date) => ({ v: 1, date, exercise: [], AM: emptySession(), PM: emptySession() });
-export const emptyBlemishes = () => ({ v: 1, nextNum: 1, items: [] });
+export const emptyBlemishes = () => ({ v: 2, nextNum: 1, items: [] });
 
 // ---- 날짜 ----
 const pad = (n) => String(n).padStart(2, '0');
@@ -122,7 +135,8 @@ export const uid = () => Date.now().toString(36) + Math.random().toString(36).sl
 export const photoName = (date, session, part) => `${date}_${session}_${part}.jpg`;
 
 // ---- 뾰루지 ----
-// blemish: { id, num, part, zone, type, causes[], start, startS, checks: [{d,s,x,y,stage,size,pain,red,tx[],ext,note}] }
+// blemishes.json v2: { v:2, nextNum, items: [blemish] }
+// blemish: { id, num, part, zone, type(처음 모양), start, startS, checks: [{d,s,x,y,stage(상태),trace,size,tx[],ext,note}] }
 export const checkKey = (c) => skey(c.d, c.s);
 export const startKey = (b) => skey(b.start, b.startS);
 
@@ -132,16 +146,26 @@ export function lastCheck(b, key) {
   return last;
 }
 export const checkAt = (b, d, s) => b.checks.find((c) => c.d === d && c.s === s) || null;
-export function healedCheck(b) {
-  return b.checks.find((c) => c.stage === 'healed') || null;
+/** 추적 종료된 체크 (흔적만 남음 / 깨끗이 사라짐) */
+export function endCheck(b) {
+  return b.checks.find((c) => isEnd(c.stage)) || null;
 }
 export function visibleAt(b, key) {
   if (startKey(b) > key) return false;
-  const h = healedCheck(b);
-  return !h || checkKey(h) >= key;
+  const e = endCheck(b);
+  return !e || checkKey(e) >= key;
 }
-export const isActive = (b) => !healedCheck(b);
+export const isActive = (b) => !endCheck(b);
 export const latestCheck = (b) => b.checks[b.checks.length - 1] || null;
+/** 가장 심했던 모양 */
+export function peakState(b) {
+  let best = null;
+  for (const c of b.checks) {
+    const st = state(c.stage);
+    if (st.group === 'active' && (!best || st.sev > best.sev)) best = st;
+  }
+  return best || state(b.type);
+}
 
 /** 체크 기본값: 직전 체크 상태 + 같은 시간대(아침/저녁) 마지막 처치 */
 export function prefillCheck(b, d, s) {
@@ -154,10 +178,9 @@ export function prefillCheck(b, d, s) {
     s,
     x: prev?.x ?? 0.5,
     y: prev?.y ?? 0.5,
-    stage: prev?.stage === 'healed' ? 'mark' : prev?.stage || 'rise',
+    stage: prev?.stage || b.type || 'papule',
+    trace: prev?.trace || null,
     size: prev?.size || 's',
-    pain: prev?.pain ?? 0,
-    red: prev?.red ?? 1,
     tx: sameSession ? [...sameSession.tx] : [],
     ext: null,
     note: '',
@@ -173,11 +196,33 @@ export function upsertCheck(b, d, s, patch) {
   }
   Object.assign(c, patch);
   if (!c.tx.includes('extract')) c.ext = null;
+  if (c.stage !== 'trace') c.trace = null;
   return c;
 }
 
+/** 생긴 날부터 추적 종료(없으면 마지막 체크)까지 일수 */
 export function daysOf(b) {
-  const h = healedCheck(b);
-  const end = h ? h.d : latestCheck(b)?.d || b.start;
+  const e = endCheck(b);
+  const end = e ? e.d : latestCheck(b)?.d || b.start;
   return diffDays(b.start, end);
+}
+
+/** 예전(v1) 기록을 새 분류로 옮김 */
+export function migrateBlemishes(bl) {
+  if (!bl || bl.v >= 2) return false;
+  const typeMap = { whitehead: 'closed', blackhead: 'open', papule: 'papule', pustule: 'pustule', nodule: 'nodule' };
+  for (const b of bl.items) {
+    const t = typeMap[b.type] || 'papule';
+    b.type = t;
+    for (const c of b.checks) {
+      const old = c.stage;
+      c.stage = { pus: 'pustule', calming: 'healing', mark: 'trace', healed: 'clear' }[old] || t;
+      c.trace = old === 'mark' ? 'pie' : null;
+      delete c.pain;
+      delete c.red;
+    }
+    delete b.causes;
+  }
+  bl.v = 2;
+  return true;
 }

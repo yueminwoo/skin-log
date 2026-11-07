@@ -1,5 +1,5 @@
 // 앱 데이터 허브: 설정, 뾰루지, 날짜별 기록을 메모리에 들고 있다가 바뀌면 자동 저장
-import { defaultSettings, emptyBlemishes, newDay } from './model.js';
+import { defaultSettings, emptyBlemishes, newDay, migrateBlemishes } from './model.js';
 
 const dayPath = (d) => `days/${d}.json`;
 
@@ -33,6 +33,7 @@ export class Hub {
     this.settings = settings || defaultSettings();
     if (!settings) this.store.saveJSON('settings.json', this.settings);
     this.blemishes = blemishes || emptyBlemishes();
+    if (migrateBlemishes(this.blemishes)) this.store.saveJSON('blemishes.json', this.blemishes);
     this.dayList = new Set(days);
   }
 
@@ -50,7 +51,10 @@ export class Hub {
     ]);
     if (this.timers.size) return;
     if (s) this.settings = s;
-    if (b) this.blemishes = b;
+    if (b) {
+      migrateBlemishes(b);
+      this.blemishes = b;
+    }
     this.dayList = new Set(list);
     dates.forEach((d, i) => this.days.set(d, ds[i] || null));
     this.emit();

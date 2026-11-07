@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'preact/hooks';
-import { useApp, Chip, Row, Sheet, toggle } from '../ui.jsx';
+import { useApp, Chip, Row, Sheet } from '../ui.jsx';
 import {
-  PARTS, BLEMISH_FACE_ZONES, TYPES, CAUSES, SIZES, EXTRACT_RESULTS, stage, zoneLabel, typeLabel, treatmentLabel,
-  fmtShort, sessionLabel, diffDays, todayStr, isActive, latestCheck, healedCheck, daysOf, photoName, partLabel,
+  PARTS, BLEMISH_FACE_ZONES, EXTRACT_RESULTS, state, whereLabel, sizeLabel, traceLabel, treatmentLabel,
+  fmtShort, sessionLabel, diffDays, todayStr, isActive, latestCheck, endCheck, peakState, daysOf, photoName,
 } from '../lib/model.js';
+import { stateText } from './Record.jsx';
+import { HelpButton } from './Guide.jsx';
 import { cropAround } from '../lib/image.js';
 
 export function Blemishes({ openId, setOpenId }) {
@@ -20,7 +22,7 @@ export function Blemishes({ openId, setOpenId }) {
     <div class="page">
       <div class="filters">
         <div class="seg sm">
-          {[['active', '진행 중'], ['healed', '완치'], ['all', '전체']].map(([id, l]) => (
+          {[['active', '진행 중'], ['ended', '종료'], ['all', '전체']].map(([id, l]) => (
             <button type="button" class={filter === id ? 'on' : ''} onClick={() => setFilter(id)}>{l}</button>
           ))}
         </div>
@@ -66,12 +68,18 @@ function useCrop(b, c, frac) {
 
 const fracFor = (b, wide) => (b.part === 'face' ? 0.16 : 0.12) * (wide ? 1.8 : 1);
 
+function endText(b) {
+  const e = endCheck(b);
+  if (!e) return null;
+  return `${daysOf(b)}일 만에 ${e.stage === 'trace' ? `흔적만 남음 (${traceLabel(e.trace)})` : '깨끗이 사라짐'}`;
+}
+
 function BlemishTile({ b, onClick }) {
-  const { hub } = useApp();
   const last = latestCheck(b);
   const src = useCrop(b, last, fracFor(b));
-  const st = stage(last.stage);
-  const healed = healedCheck(b);
+  const st = state(last.stage);
+  const peak = peakState(b);
+  const ended = endText(b);
   return (
     <button type="button" class="btile" onClick={onClick}>
       <div class="btile-img">
@@ -79,11 +87,8 @@ function BlemishTile({ b, onClick }) {
         <span class="num" style={{ '--c': st.color }}>{b.num}</span>
       </div>
       <div class="btile-info">
-        <strong>{b.part === 'face' ? zoneLabel(b.zone) : partLabel(b.part)} · {typeLabel(b.type)}</strong>
-        <small>
-          {healed ? `${daysOf(b)}일 만에 완치` : `D+${diffDays(b.start, todayStr())} · `}
-          {!healed && <span style={{ color: st.color }}>{st.label}</span>}
-        </small>
+        <strong>{whereLabel(b)} · <span style={{ color: st.color }}>{st.label}</span></strong>
+        <small>{ended || `D+${diffDays(b.start, todayStr())} · 가장 심할 때 ${peak.label}`}</small>
         <small class="muted">{fmtShort(b.start)} 시작 · 체크 {b.checks.length}회</small>
       </div>
     </button>
@@ -98,15 +103,16 @@ function BlemishDetail({ b, onClose }) {
     fn(b);
     hub.touchBlemishes();
   };
-  const healed = healedCheck(b);
+  const end = endCheck(b);
 
   return (
-    <Sheet title={`#${b.num} ${b.part === 'face' ? zoneLabel(b.zone) : partLabel(b.part)} · ${typeLabel(b.type)}`} onClose={onClose} wide>
+    <Sheet title={`#${b.num} ${whereLabel(b)}`} onClose={onClose} wide>
       <div class="detail-meta">
         <span>{fmtShort(b.start)} {sessionLabel(b.startS)} 시작</span>
-        <span>{healed ? `${daysOf(b)}일 만에 완치 (${fmtShort(healed.d)})` : `진행 중 · D+${diffDays(b.start, todayStr())}`}</span>
-        {b.causes.length > 0 && <span>의심 원인: {b.causes.join(', ')}</span>}
-        <button type="button" class="link-btn" onClick={() => setEdit(!edit)}>{edit ? '편집 닫기' : '정보 편집'}</button>
+        <span>처음 {state(b.type).label} · 가장 심할 때 {peakState(b).label}</span>
+        <span>{end ? endText(b) : `추적 중 · D+${diffDays(b.start, todayStr())}`}</span>
+        <HelpButton />
+        <button type="button" class="link-btn" onClick={() => setEdit(!edit)}>{edit ? '편집 닫기' : '편집'}</button>
       </div>
       {edit && (
         <div class="detail-edit">
@@ -115,18 +121,23 @@ function BlemishDetail({ b, onClose }) {
               {BLEMISH_FACE_ZONES.map((z) => <Chip small on={b.zone === z.id} onClick={() => set((x) => (x.zone = z.id))}>{z.label}</Chip>)}
             </Row>
           )}
-          <Row label="종류">
-            {TYPES.map((t) => <Chip small on={b.type === t.id} onClick={() => set((x) => (x.type = t.id))}>{t.label}</Chip>)}
-          </Row>
-          <Row label="의심 원인">
-            {CAUSES.map((c) => <Chip small on={b.causes.includes(c)} onClick={() => set((x) => toggle(x.causes, c))}>{c}</Chip>)}
-          </Row>
-          <button type="button" class="btn sm danger" onClick={() => {
-            if (!confirm(`#${b.num} 뾰루지 기록을 통째로 삭제할까요?`)) return;
-            hub.blemishes.items = hub.blemishes.items.filter((x) => x.id !== b.id);
-            hub.touchBlemishes();
-            onClose();
-          }}>이 뾰루지 삭제</button>
+          <div class="detail-edit-actions">
+            {end && (
+              <button type="button" class="btn sm" onClick={() => {
+                if (!confirm(`${fmtShort(end.d)} ${sessionLabel(end.s)}의 "추적 종료"를 "아무는 중"으로 바꾸고 다시 추적할까요?`)) return;
+                set(() => {
+                  end.stage = 'healing';
+                  end.trace = null;
+                });
+              }}>추적 다시 시작</button>
+            )}
+            <button type="button" class="btn sm danger" onClick={() => {
+              if (!confirm(`#${b.num} 뾰루지 기록을 통째로 삭제할까요?`)) return;
+              hub.blemishes.items = hub.blemishes.items.filter((x) => x.id !== b.id);
+              hub.touchBlemishes();
+              onClose();
+            }}>이 뾰루지 삭제</button>
+          </div>
         </div>
       )}
 
@@ -145,16 +156,14 @@ function BlemishDetail({ b, onClose }) {
       <div class="table-wrap">
         <table class="log">
           <thead>
-            <tr><th>날짜</th><th>단계</th><th>크기</th><th>통증</th><th>붉은기</th><th>처치</th><th>메모</th></tr>
+            <tr><th>날짜</th><th>상태</th><th>크기</th><th>처치</th><th>메모</th></tr>
           </thead>
           <tbody>
             {b.checks.map((c) => (
               <tr>
                 <td>{fmtShort(c.d)} {c.s === 'AM' ? '☀️' : '🌙'}</td>
-                <td><span class="stage-dot" style={{ background: stage(c.stage).color }} />{stage(c.stage).label}</td>
-                <td>{SIZES.find((s) => s.id === c.size)?.label}</td>
-                <td>{c.pain}</td>
-                <td>{c.red}</td>
+                <td><span class="stage-dot" style={{ background: state(c.stage).color }} />{stateText(c)}</td>
+                <td>{sizeLabel(c.size)}</td>
                 <td>
                   {c.tx.map((t) => treatmentLabel(t, hub.settings)).join(', ')}
                   {c.ext && ` (${EXTRACT_RESULTS.find((r) => r.id === c.ext)?.label})`}
@@ -172,13 +181,13 @@ function BlemishDetail({ b, onClose }) {
 function Frame({ b, c, frac }) {
   const src = useCrop(b, c, frac);
   if (src === null) return null;
-  const st = stage(c.stage);
+  const st = state(c.stage);
   return (
     <figure class="frame">
       {src ? <img src={src} alt="" /> : <div class="frame-ph" />}
       <figcaption>
         <b>D+{diffDays(b.start, c.d)}</b> {c.s === 'AM' ? '☀️' : '🌙'}
-        <span style={{ color: st.color }}>{st.label}</span>
+        <span style={{ color: st.color }}>{stateText(c)}</span>
       </figcaption>
     </figure>
   );

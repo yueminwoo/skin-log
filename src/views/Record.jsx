@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, useLayoutEffect } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import { useApp, Chip, Row, Section, usePhotoURL, toggle } from '../ui.jsx';
 import {
-  SESSIONS, PARTS, FACE_ZONES, BODY_ZONES, BLEMISH_FACE_ZONES, STAGES, TYPES, SIZES, LEVELS, CAUSES, TREATMENTS,
-  EXTRACT_RESULTS, stage, zoneLabel, typeLabel, treatmentLabel, fmtDate, fmtShort, addDays, todayStr, diffDays,
-  sessionLabel, skey, photoName, uid, checkAt, prefillCheck, upsertCheck, visibleAt, lastCheck,
+  SESSIONS, PARTS, FACE_ZONES, BODY_ZONES, BLEMISH_FACE_ZONES, STATES, MORPHS, TRACES, SIZES, TREATMENTS,
+  EXTRACT_RESULTS, state, isEnd, whereLabel, sizeLabel, traceLabel, treatmentLabel, fmtDate, fmtShort, addDays,
+  todayStr, diffDays, sessionLabel, skey, photoName, uid, checkAt, prefillCheck, upsertCheck, visibleAt, lastCheck,
 } from '../lib/model.js';
+import { HelpButton } from './Guide.jsx';
 import { resizeImage } from '../lib/image.js';
 
 const FACE_IDS = FACE_ZONES.map((z) => z.id);
@@ -177,7 +178,7 @@ function Pins({ list, date, session, focus, drag, onPinDown, onPinClick }) {
   return list.map((b) => {
     const c = checkAt(b, date, session);
     const p = pinPos(b, date, session, drag);
-    const st = stage((c || lastCheck(b, skey(date, session)) || b.checks[0]).stage);
+    const st = state((c || lastCheck(b, skey(date, session)) || b.checks[0]).stage);
     return (
       <span
         class={`pin${c ? '' : ' unchecked'}${focus === b.id ? ' focus' : ''}`}
@@ -288,11 +289,10 @@ function PinEditor({ date, session, part, onClose }) {
               num: bl.nextNum++,
               part,
               zone: part === 'face' ? info.zone : part,
-              type: info.type,
-              causes: info.causes,
+              type: info.stage,
               start: date,
               startS: session,
-              checks: [{ d: date, s: session, x: pending.x, y: pending.y, stage: info.stage, size: info.size, pain: info.pain, red: info.red, tx: [], ext: null, note: '' }],
+              checks: [{ d: date, s: session, x: pending.x, y: pending.y, stage: info.stage, trace: null, size: info.size, tx: [], ext: null, note: '' }],
             };
             bl.items.push(b);
             hub.touchBlemishes();
@@ -311,7 +311,7 @@ function PinEditor({ date, session, part, onClose }) {
 }
 
 function NewBlemishForm({ part, onAdd, onCancel }) {
-  const [f, setF] = useState({ zone: null, type: 'papule', causes: [], stage: 'rise', size: 's', pain: 0, red: 1 });
+  const [f, setF] = useState({ zone: null, stage: 'papule', size: 's' });
   const set = (p) => setF({ ...f, ...p });
   const ok = part !== 'face' || f.zone;
   return (
@@ -321,30 +321,55 @@ function NewBlemishForm({ part, onAdd, onCancel }) {
           {BLEMISH_FACE_ZONES.map((z) => <Chip on={f.zone === z.id} onClick={() => set({ zone: z.id })}>{z.label}</Chip>)}
         </Row>
       )}
-      <Row label="종류">
-        {TYPES.map((t) => <Chip on={f.type === t.id} onClick={() => set({ type: t.id })}>{t.label}</Chip>)}
+      <Row label={<>모양 <HelpButton /></>}>
+        {MORPHS.map((m) => <Chip on={f.stage === m.id} color={m.color} onClick={() => set({ stage: m.id })}>{m.label}</Chip>)}
       </Row>
-      <Row label="단계">
-        {STAGES.slice(0, 4).map((s) => <Chip on={f.stage === s.id} color={s.color} onClick={() => set({ stage: s.id })}>{s.label}</Chip>)}
-      </Row>
-      <Row label="크기">
-        {SIZES.map((s) => <Chip on={f.size === s.id} onClick={() => set({ size: s.id })}>{s.label}</Chip>)}
-      </Row>
-      <Row label="통증">
-        {LEVELS.map((n) => <Chip on={f.pain === n} onClick={() => set({ pain: n })}>{n}</Chip>)}
-      </Row>
-      <Row label="붉은기">
-        {LEVELS.map((n) => <Chip on={f.red === n} onClick={() => set({ red: n })}>{n}</Chip>)}
-      </Row>
-      <Row label="의심 원인">
-        {CAUSES.map((c) => <Chip small on={f.causes.includes(c)} onClick={() => set({ causes: toggle([...f.causes], c) })}>{c}</Chip>)}
-      </Row>
+      <SizeRow value={f.size} onChange={(size) => set({ size })} />
       <div class="form-actions">
         <button type="button" class="btn ghost" onClick={onCancel}>취소</button>
         <button type="button" class="btn primary" disabled={!ok} onClick={() => onAdd(f)}>{ok ? '추가' : '부위를 골라주세요'}</button>
       </div>
     </div>
   );
+}
+
+function SizeRow({ value, onChange, small }) {
+  return (
+    <Row label="크기">
+      {SIZES.map((x) => (
+        <Chip small={small} on={value === x.id} onClick={() => onChange(x.id)}>
+          {x.label} <span class="chip-hint">{x.hint}</span>
+        </Chip>
+      ))}
+    </Row>
+  );
+}
+
+/** 상태 고르기: 진행 중 모양 / 회복 / 추적 종료 */
+export function StateRows({ v, set }) {
+  const group = (g) => STATES.filter((x) => x.group === g);
+  return (
+    <>
+      <Row label={<>상태 <HelpButton /></>}>
+        <span class="chip-group-label">진행 중</span>
+        {group('active').map((x) => <Chip small on={v.stage === x.id} color={x.color} onClick={() => set({ stage: x.id })}>{x.label}</Chip>)}
+        <span class="chip-group-label">회복</span>
+        {group('healing').map((x) => <Chip small on={v.stage === x.id} color={x.color} onClick={() => set({ stage: x.id })}>{x.label}</Chip>)}
+        <span class="chip-group-label">추적 종료</span>
+        {group('end').map((x) => <Chip small on={v.stage === x.id} color={x.color} onClick={() => set({ stage: x.id, ...(x.id === 'trace' && !v.trace ? { trace: 'pie' } : {}) })}>{x.label}</Chip>)}
+      </Row>
+      {v.stage === 'trace' && (
+        <Row label="흔적 종류">
+          {TRACES.map((t) => <Chip small on={v.trace === t.id} onClick={() => set({ trace: t.id })}>{t.label}</Chip>)}
+        </Row>
+      )}
+    </>
+  );
+}
+
+export function stateText(c) {
+  const st = state(c.stage);
+  return c.stage === 'trace' && c.trace ? `${st.label} (${traceLabel(c.trace)})` : st.label;
 }
 
 function BlemishList({ date, session, part, focus, setFocus, openBlemish, onAdd }) {
@@ -380,7 +405,8 @@ export function BlemishCard({ b, date, session, defaultOpen, openBlemish }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const c = checkAt(b, date, session);
   const v = c || prefillCheck(b, date, session);
-  const st = stage(v.stage);
+  const st = state(v.stage);
+  const ended = isEnd(v.stage);
   const set = (patch) => {
     upsertCheck(b, date, session, patch);
     hub.touchBlemishes();
@@ -389,14 +415,18 @@ export function BlemishCard({ b, date, session, defaultOpen, openBlemish }) {
   const dn = diffDays(b.start, date);
 
   return (
-    <div class={`bcard${c ? '' : ' unchecked'}`}>
+    <div class={`bcard${c ? '' : ' unchecked'}${ended && c ? ' ended' : ''}`}>
       <div class="bcard-head">
         <span class="num" style={{ '--c': st.color }}>{b.num}</span>
         <div class="bcard-title">
-          <strong>{b.part === 'face' ? zoneLabel(b.zone) : zoneLabel(b.part)} · {typeLabel(b.type)}</strong>
+          <strong>
+            {whereLabel(b)} · <span style={{ color: st.color }}>{stateText(v)}</span>
+          </strong>
           <small>
-            {dn === 0 ? '오늘 생김' : `D+${dn}`} · <span style={{ color: st.color }}>{st.label}</span> · 크기 {SIZES.find((s) => s.id === v.size)?.label} · 통증 {v.pain} · 붉은기 {v.red}
+            {dn === 0 ? '오늘 생김' : `D+${dn}`}
+            {!ended && ` · 크기 ${sizeLabel(v.size)}`}
             {v.tx.length > 0 && ` · ${v.tx.map((t) => treatmentLabel(t, hub.settings)).join(', ')}`}
+            {ended && c && ' · 추적 종료'}
           </small>
         </div>
         <div class="bcard-actions">
@@ -407,18 +437,8 @@ export function BlemishCard({ b, date, session, defaultOpen, openBlemish }) {
       </div>
       {open && (
         <div class="bcard-body">
-          <Row label="단계">
-            {STAGES.map((s) => <Chip small on={v.stage === s.id} color={s.color} onClick={() => set({ stage: s.id })}>{s.label}</Chip>)}
-          </Row>
-          <Row label="크기">
-            {SIZES.map((s) => <Chip small on={v.size === s.id} onClick={() => set({ size: s.id })}>{s.label}</Chip>)}
-          </Row>
-          <Row label="통증">
-            {LEVELS.map((n) => <Chip small on={v.pain === n} onClick={() => set({ pain: n })}>{n}</Chip>)}
-          </Row>
-          <Row label="붉은기">
-            {LEVELS.map((n) => <Chip small on={v.red === n} onClick={() => set({ red: n })}>{n}</Chip>)}
-          </Row>
+          <StateRows v={v} set={set} />
+          {!ended && <SizeRow small value={v.size} onChange={(size) => set({ size })} />}
           <Row label="처치">
             {TREATMENTS.map((t) => <Chip small on={v.tx.includes(t.id)} onClick={() => set({ tx: toggle([...v.tx], t.id) })}>{t.label}</Chip>)}
             {spots.map((p) => <Chip small on={v.tx.includes('p:' + p.id)} onClick={() => set({ tx: toggle([...v.tx], 'p:' + p.id) })}>💊 {p.name}</Chip>)}
@@ -499,15 +519,26 @@ function Routine({ date, session }) {
       <Section
         title={`${session === 'AM' ? '☀️' : '🌙'} ${sessionLabel(session)} 루틴`}
         right={
-          prev && (
-            <button type="button" class={`btn sm${empty ? ' primary' : ' ghost'}`} onClick={() => {
-              if (!empty && !confirm('지금 선택한 내용을 지우고 복사할까요?')) return;
-              edit((s) => {
-                s.cleansing = [...prev.session.cleansing];
-                s.skincare = structuredClone(prev.session.skincare);
-              });
-            }}>↺ {fmtShort(prev.date)} {sessionLabel(session)}과 동일</button>
-          )
+          <div class="head-actions">
+            {prev && (
+              <button type="button" class={`btn sm${empty ? ' primary' : ' ghost'}`} onClick={() => {
+                if (!empty && !confirm('지금 선택한 내용을 지우고 복사할까요?')) return;
+                edit((s) => {
+                  s.cleansing = [...prev.session.cleansing];
+                  s.skincare = structuredClone(prev.session.skincare);
+                });
+              }}>↺ {fmtShort(prev.date)} {sessionLabel(session)}과 동일</button>
+            )}
+            {!empty && (
+              <button type="button" class="btn sm ghost" onClick={() => {
+                if (!confirm(`${sessionLabel(session)} 클렌징·스킨케어 선택을 모두 지울까요?`)) return;
+                edit((s) => {
+                  s.cleansing = [];
+                  s.skincare = {};
+                });
+              }}>초기화</button>
+            )}
+          </div>
         }
       >
         <h3 class="sub">🫧 클렌징</h3>
@@ -564,6 +595,7 @@ function Routine({ date, session }) {
 function Exercise({ date }) {
   const { hub } = useApp();
   const list = hub.days.get(date)?.exercise || [];
+  const none = !!hub.days.get(date)?.noExercise;
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const addLock = useRef(false);
@@ -571,7 +603,17 @@ function Exercise({ date }) {
     fn(hub.day(date).exercise);
     hub.touchDay(date);
   };
-  const add = (type) => edit((ex) => ex.push({ id: uid(), type, minutes: 60, shower: null }));
+  const add = (type) => {
+    hub.day(date).noExercise = false;
+    edit((ex) => ex.push({ id: uid(), type, minutes: 60, shower: null }));
+  };
+  function toggleNone() {
+    const day = hub.day(date);
+    if (!none && list.length && !confirm('기록한 운동을 지우고 "운동 안 함"으로 할까요?')) return;
+    day.noExercise = !none;
+    if (day.noExercise) day.exercise = [];
+    hub.touchDay(date);
+  }
 
   function addType() {
     if (addLock.current) return;
@@ -605,6 +647,7 @@ function Exercise({ date }) {
         </div>
       ))}
       <div class="chips">
+        <Chip on={none} onClick={toggleNone}>🚫 운동 안 함</Chip>
         {hub.settings.exerciseTypes.map((t) => <Chip onClick={() => add(t)}>＋ {t}</Chip>)}
         {adding ? (
           <form class="inline-add" onSubmit={(e) => (e.preventDefault(), addType())}>

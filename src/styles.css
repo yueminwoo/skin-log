@@ -324,3 +324,23 @@ table.log th { color: var(--muted); font-weight: 600; }
   .prod-row .input:first-child { grid-column: auto; }
 }
 .link-btn.center { align-self: center; font-size: 13px; font-weight: 500; text-decoration: none; }
+
+/* ── 상태 · 도움말 ── */
+.help-btn {
+  width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface);
+  color: var(--muted); font-size: 12px; font-weight: 700; line-height: 1; padding: 0; vertical-align: 1px; flex: none;
+}
+.help-btn:hover { color: var(--accent); border-color: var(--accent); }
+.row-label { width: 72px; }
+.chip-group-label { flex-basis: 100%; font-size: 11.5px; color: var(--muted); margin: 4px 0 -2px; }
+.chip-group-label:first-child { margin-top: 0; }
+.chip-hint { font-size: 11px; opacity: 0.7; font-weight: 400; margin-left: 2px; }
+.head-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.bcard.ended { opacity: 0.75; }
+.detail-edit-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.guide h3 { font-size: 15px; margin: 18px 0 8px; }
+.guide h3:first-child { margin-top: 4px; }
+.guide-table td.wrap { white-space: normal; min-width: 180px; }
+.guide-list { padding-left: 4px; list-style: none; margin: 0 0 8px; font-size: 14px; }
+.guide-list li { margin: 6px 0; }
+.guide-list ul { padding-left: 20px; list-style: disc; margin: 4px 0; color: var(--muted); font-size: 13px; }
